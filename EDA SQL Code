@@ -1,0 +1,152 @@
+-- Data that we will be using:
+
+SELECT Location,date, total_cases, new_cases,total_deaths,population
+FROM project.dbo.CovidData
+Order by 1
+
+-- We will be looking at total cases Vs total deaths
+
+SELECT location, SUM(CAST(total_cases AS INT)) as Total_Cases, SUM(CAST(total_deaths AS INT)) as Total_Deaths
+FROM project.dbo.CovidData
+GROUP BY location
+ORDER BY location;
+
+-- Was getting Error dividing by zero so we used NULLIF that will divide by NUll if the denominator is 0
+SELECT location, SUM(CAST(total_cases AS bigint)) AS Total_Cases, SUM(CAST(total_deaths AS bigint)) AS Total_Deaths,
+    SUM(CAST(total_cases AS bigint)) / NULLIF(SUM(CAST(total_deaths AS bigint)), 0) AS Registered_Cases_per_Death
+FROM project.dbo.CovidData
+GROUP BY location
+ORDER BY location;
+
+
+-- We were getting 0's in Death_percentage column because the SQL rounds down the division function of 2 integers getting us all zero's
+SELECT location Counteries, SUM(CAST(total_cases AS bigint)) Total_Cases, SUM(CAST(total_deaths as bigint)) Total_Deaths,
+             SUM(CAST(total_deaths as bigint)) / NULLIF(SUM(CAST(total_cases AS bigint)),0) * 100 as Death_percentage
+FROM project.dbo.CovidData
+GROUP BY location
+ORDER BY location
+
+-- We are multiplying 100.0 in the start to avoid getting all zero's, and using Format function to get the answer to only 2 Decimals
+SELECT location AS Countries,
+       SUM(CAST(total_cases AS bigint)) AS Total_Cases,
+       SUM(CAST(total_deaths AS bigint)) AS Total_Deaths,
+       FORMAT((SUM(CAST(total_deaths AS bigint)) * 100.0) / NULLIF(SUM(CAST(total_cases AS bigint)), 0), 'N2') AS Death_percentage
+FROM project.dbo.CovidData
+GROUP BY location
+ORDER BY Death_percentage DESC;
+
+-- Total Cases VS Total Population
+
+SELECT location, AVG(CAST(population as bigint)) Total_Population, SUM(CAST(new_cases as bigint)) Total_Cases,
+   FORMAT( (SUM(CAST(new_cases as bigint))*100.0) / (AVG(CAST(population as bigint))), 'N2') Cases_Percentage
+FROM project.dbo.CovidData
+GROUP BY location
+Order By Cases_Percentage DESC;
+
+
+-- Now I will Write a Querry to find out top 10 Counteries with highest Covid +ive Percentage
+SELECT Top 10 location, AVG(CAST(population as bigint)) Total_Population, SUM(CAST(new_cases as bigint)) Total_Cases,
+   FORMAT( (SUM(CAST(new_cases as bigint))*100.0) / (AVG(CAST(population as bigint))), 'N2') Cases_Percentage
+FROM project.dbo.CovidData
+GROUP BY location
+Order By Cases_Percentage DESC
+
+-- Using Sub-Queries to retrive the maximum Covid +ive percentage location
+
+SELECT location, Total_Population, Total_Cases, Cases_Percentage
+FROM (
+    SELECT location,
+           AVG(CAST(population AS bigint)) AS Total_Population,
+           SUM(CAST(new_cases AS bigint)) AS Total_Cases,
+           FORMAT((SUM(CAST(new_cases AS bigint)) * 100.0) / AVG(CAST(population AS bigint)), 'N2') AS Cases_Percentage
+    FROM project.dbo.CovidData
+    GROUP BY location
+) AS subquery
+WHERE Cases_Percentage = (SELECT MAX(Cases_Percentage) FROM (
+    SELECT FORMAT((SUM(CAST(new_cases AS bigint)) * 100.0) / AVG(CAST(population AS bigint)), 'N2') AS Cases_Percentage
+    FROM project.dbo.CovidData
+    GROUP BY location
+) AS max_percentage)
+
+
+------- ==============================
+SELECT TOP 2 *
+FROM project.dbo.CovidData
+
+SELECT location, Total_Population, Total_Cases, Covid_positive_percentage
+FROM ( Select location, AVG(CAST(population AS bigint)) Total_Population, SUM(CAST(new_cases AS bigint)) Total_Cases, 
+       FORMAT( (SUM(CAST(new_cases AS bigint)) * 100.0) / AVG(CAST(population AS bigint)), 'N2') Covid_positive_percentage
+       FROM project.dbo.CovidData
+	   GROUP BY location
+	   ) AS subquery
+
+	   WHERE Covid_positive_percentage= ( SELECT MAX(Covid_positive_percentage)
+	                                      FROM ( SELECT FORMAT( (SUM(CAST(new_cases AS bigint)) * 100.0) / AVG(CAST(population AS bigint)), 'N2') Covid_positive_percentage
+                                                 FROM project.dbo.CovidData
+												 GROUP BY location
+												 ) AS max_percentage)
+
+---- PRACTICING SUB-QUERY
+
+SELECT location, Total_Population, Total_Cases, Covid_Positive_Percentage
+      FROM (
+	         SELECT location, AVG(CAST(population AS bigint)) AS Total_Population, SUM(CAST(new_cases AS bigint)) AS Total_Cases,
+			     FORMAT( (SUM(CAST(new_cases AS bigint)) * 100.0) / AVG(CAST(population AS bigint)), 'N2') AS Covid_Positive_Percentage
+
+			FROM project.dbo.CovidData
+
+				 GROUP BY location
+				 ) AS Subquery
+
+     WHERE Covid_Positive_Percentage = (
+	                SELECT MIN(Covid_Positive_Percentage)
+					FROM ( SELECT FORMAT( (SUM(CAST(new_cases AS bigint)) * 100.0) / AVG(CAST(population AS bigint)), 'N2') Covid_Positive_Percentage
+					FROM project.dbo.CovidData
+					GROUP BY location ) AS minimum_ive)
+					    
+-- Counteries with Highest Covid-19 Death Rate
+
+SELECT *
+from project.dbo.CovidData
+WHERE location ='Asia'
+
+-- Using Where clause to exclude continents and only include counteries:
+
+SELECT location, MAX(CAST(population AS bigint)) Total_Population, MAX(CAST(total_deaths AS bigint)) Total_Deaths,
+FORMAT( (MAX(CAST(total_deaths AS bigint)) * 100.0) / MAX(CAST(population AS bigint)), 'N2') Covid_Death_Rate
+from project.dbo.CovidData
+WHERE continent != ' '
+GROUP BY location
+Order By Total_Deaths DESC;
+
+-- Analysis Continents:
+
+SELECT TOP 2 *
+from project.dbo.CovidData
+GROUP BY continent
+
+
+
+
+SELECT location, MAX(CAST(population AS bigint)) Total_Population, MAX(CAST(total_deaths AS bigint)) Total_Deaths,
+FORMAT( (MAX(CAST(total_deaths AS bigint)) * 100.0) / MAX(CAST(population AS bigint)), 'N2') Covid_Death_Rate
+from project.dbo.CovidData
+WHERE location='Asia' OR location='Africa' OR location='Europe' OR location LIKE '%America'
+GROUP BY location
+Order By Total_Population DESC;
+
+-- GLOBAL DATA:
+
+SELECT location, MAX(CAST(population AS bigint)) Total_Population, SUM(CAST(new_deaths AS bigint)) Total_Deaths,
+ FORMAT( (SUM(CAST(new_deaths AS bigint)) * 100.0) / MAX(CAST(total_cases AS bigint)), 'N2') Covid_Death_Rate, 
+ FORMAT( (MAX(CAST(total_cases AS bigint)) * 100.0) / MAX(CAST(population AS bigint)), 'N2') Covid_Positivity_Rate
+FROM project.dbo.CovidData
+WHERE location='World'
+GROUP BY location
+
+-- Testing Global Data
+
+SELECT *
+FROM project.dbo.CovidData
+WHERE location='World'
+ORDER BY 4
