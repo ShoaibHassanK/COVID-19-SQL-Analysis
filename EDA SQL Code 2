@@ -1,0 +1,93 @@
+-- Joining two tables
+
+SELECT CovidData.location, MAX(CAST(CovidVaccinations.total_vaccinations AS bigint))
+FROM project..CovidData
+JOIN project..CovidVaccinations
+ON CovidData.date= CovidVaccinations.date
+AND CovidData.location=CovidVaccinations.location
+GROUP BY CovidData.location
+ORDER BY location
+
+SELECT location,date, total_tests, total_vaccinations
+FROM project..CovidVaccinations
+ORDER BY location
+
+-- Looking at total population and vacciations - USE of Window Function
+SELECT covd.location, covd.date ,covd.population World_Popoulation , covd.total_cases Total_Cases, covv.total_vaccinations Total_Vaccinations,
+SUM(CAST(covv.total_vaccinations as bigint)) OVER (PARTITION BY covd.date) Sum_of_Vaccinations
+FROM project..CovidData covd
+JOIN project..CovidVaccinations covv
+ON covd.location = covv.location
+AND covd.date=covv.date
+WHERE covd.location='World' 
+ORDER BY DATEPART(YEAR, covd.date), DATEPART(MONTH, covd.date)
+
+----- Combined Population and vaccination
+
+SELECT covd.location, MAX(CAST(covd.population AS bigint)) Total_Population, MAX(CAST(covv.total_vaccinations AS bigint)) Total_Vaccinations
+FROM project.dbo.CovidData covd
+JOIN project..CovidVaccinations covv
+ON covd.location = covv.location
+WHERE covd.continent=' '
+GROUP BY covd.location
+
+---Country wise Vaccinated Population Percentage
+
+SELECT covd.location, MAX(CAST( covd.population AS bigint)) Total_Population, MAX(CAST (covv.people_vaccinated AS bigint)) Total_Vaccination, 
+     FORMAT( MAX(CAST (covv.people_vaccinated AS bigint))*100.0 / MAX(CAST( covd.population AS bigint))  , 'N2') AS Vaccinated_pop_percent
+FROM project.dbo.CovidData covd
+JOIN project..CovidVaccinations covv
+ON covd.location = covv.location
+GROUP BY covd.location
+ORDER BY covd.location
+
+
+-- USING CTE - Common Table Expression
+
+WITH popvsvacc AS (
+
+ SELECT covd.location, MAX(CAST( covd.population AS bigint)) Total_Population, MAX(CAST (covv.people_vaccinated AS bigint)) Total_Vaccination, 
+     FORMAT( MAX(CAST (covv.people_vaccinated AS bigint))*100.0 / MAX(CAST( covd.population AS bigint))  , 'N2') AS Vaccinated_pop_percent
+FROM project.dbo.CovidData covd
+JOIN project..CovidVaccinations covv
+ON covd.location = covv.location
+GROUP BY covd.location
+
+
+)
+-- 
+SELECT* 
+FROM popvsvacc
+
+
+--- Use of TEMP Table 
+DROP TABLE IF EXISTS #popuuvaccuu;
+CREATE TABLE #popuuvaccuu (
+  location nvarchar(255),
+  Population bigint,
+  Vaccination bigint,
+  Vaccinated_percent numeric 
+  )
+
+  INSERT INTO #popuuvaccuu
+   SELECT covd.location, MAX(CAST( covd.population AS bigint)) Total_Population, MAX(CAST (covv.people_vaccinated AS bigint)) Total_Vaccination, 
+     FORMAT( MAX(CAST (covv.people_vaccinated AS bigint))*100.0 / MAX(CAST( covd.population AS bigint))  , 'N2') AS Vaccinated_pop_percent
+FROM project.dbo.CovidData covd
+JOIN project..CovidVaccinations covv
+ON covd.location = covv.location
+GROUP BY covd.location
+
+
+SELECT *
+FROM #popuuvaccuu
+
+-- Creating a View 
+CREATE VIEW pop_vs_vacc AS 
+SELECT covd.location, MAX(CAST(covd.population AS bigint)) Total_Population, MAX(CAST(covv.people_vaccinated AS bigint)) Total_Vaccination, 
+     FORMAT(MAX(CAST(covv.people_vaccinated AS bigint)) * 100.0 / MAX(CAST(covd.population AS bigint)), 'N2') AS Vaccinated_pop_percent
+FROM project.dbo.CovidData covd
+JOIN project..CovidVaccinations covv ON covd.location = covv.location
+GROUP BY covd.location;
+
+SELECT *
+FROM pop_vs_vacc;
